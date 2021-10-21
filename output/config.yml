@@ -1,0 +1,7 @@
+region: cn-chengdu
+accesskeyid: LTAI5tEWHPWX6uQoN9FhFgP7
+secretkey: xxxxx
+domainname: 2468.zone
+rr: "@"
+type: A
+updateduration: 10

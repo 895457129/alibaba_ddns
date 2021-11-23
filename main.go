@@ -6,6 +6,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"time"
 )
 
@@ -44,8 +45,11 @@ func updateDNS(c Config)  {
 	if err != nil {
 		panic(err)
 	}
+	ip, err := GetPublicIp()
+	if len(ip) == 0 {
+		panic("获取公网ip地址错误")
+	}
 	if response.TotalCount >= 1 {
-		ip := GetPublicIp()
 		RecordId := response.DomainRecords.Record[0].RecordId
 		changeRequest := alidns.CreateUpdateDomainRecordRequest()
 		changeRequest.RecordId = RecordId
@@ -63,8 +67,7 @@ func updateDNS(c Config)  {
 		addRequest.DomainName = c.DomainName
 		addRequest.RR = c.RR
 		addRequest.Type = c.Type
-		addRequest.Value = GetPublicIp()
-		ip := GetPublicIp()
+		// addRequest.Value = GetPublicIp()
 		_, er := client.AddDomainRecord(addRequest)
 		if er != nil {
 			fmt.Println("新增记录失败:", er)
@@ -74,14 +77,79 @@ func updateDNS(c Config)  {
 	}
 }
 
-func GetPublicIp() string {
-	responseClient, errClient := http.Get("http://ip.dhcp.cn/?ip") // 获取外网 IP
+func GetPublicIp() (string, error) {
+	var ip string
+	var err error
+	ip, err = GetPublicIp1()
+	if err != nil {
+		ip, err = GetPublicIp2()
+		if err != nil {
+			ip, err = GetPublicIp3()
+			if err != nil {
+				ip, err = GetPublicIp4()
+			}
+		}
+	}
+	return ip, err
+}
+
+func GetPublicIp1() (string, error) {
+	responseClient, errClient := http.Get("http://www.net.cn/static/customercare/yourip.asp") // 获取外网 IP
 	if errClient != nil {
 		fmt.Printf("获取外网 IP 失败，请检查网络\n")
-		panic(errClient)
+		return "", errClient
 	}
 	defer responseClient.Body.Close()
-	body, _ := ioutil.ReadAll(responseClient.Body)
-	return fmt.Sprintf("%s", string(body))
+	content, err := ioutil.ReadAll(responseClient.Body)
+	reg := regexp.MustCompile(`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`)
+	// 利用正则表达式匹配规则对象匹配指定字符串
+	res := reg.FindString(string(content))
+	if len(res) == 0 {
+		return "", err
+	}
+	return res, nil
+}
+
+func GetPublicIp2() (string, error) {
+	resp, err := http.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	content, _ := ioutil.ReadAll(resp.Body)
+	return string(content), nil
+}
+
+func GetPublicIp3() (string, error) {
+	resp, err := http.Get("https://ip.tool.lu/")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	content, _ := ioutil.ReadAll(resp.Body)
+	reg := regexp.MustCompile(`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`)
+	// 利用正则表达式匹配规则对象匹配指定字符串
+	res := reg.FindString(string(content))
+	if len(res) == 0 {
+		return "", err
+	}
+	return res, nil
+}
+
+
+func GetPublicIp4() (string, error) {
+	resp, err := http.Get("http://www.cip.cc/")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	content, _ := ioutil.ReadAll(resp.Body)
+	reg := regexp.MustCompile(`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`)
+	// 利用正则表达式匹配规则对象匹配指定字符串
+	res := reg.FindString(string(content))
+	if len(res) == 0 {
+		return "", err
+	}
+	return res, nil
 }
 
